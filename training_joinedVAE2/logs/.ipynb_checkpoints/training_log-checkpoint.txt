@@ -1,0 +1,6 @@
+Device: cuda
+Model size: 15238723 
+
+Model weight LatentVAE1_256_128.pth loaded. 
+
+n_train: 144911, n_val: 7945
