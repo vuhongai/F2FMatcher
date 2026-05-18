@@ -194,13 +194,13 @@ f2fmatcher run-pipeline \
     --export-images
 ```
 
-### Batch processing (Python param file, backward-compatible)
+### Batch processing
 
 ```bash
 f2fmatcher run-pipeline --param-file /path/to/param_file.py
 ```
 
-Where `param_file.py` defines: `source_1`, `source_2`, `czi_img1`, `channel_index_img1`, `CP_model_name_1`, `list_pair_images`, etc.
+The param file defines: `source_1`, `source_2`, `czi_img1`, `channel_index_img1`, `CP_model_name_1`, `list_pair_images`, etc.
 
 ### Training
 
