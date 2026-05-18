@@ -33,7 +33,7 @@ classifier:
   checkpoint: models/fibermatcher_cls_2.pth
 
 cellpose:
-  model_path: /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models
+  model_path: models/CellPose2_finetuned
   cellprob_threshold: 0
   flow_threshold: 0.4
 
