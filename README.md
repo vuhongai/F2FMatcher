@@ -1,10 +1,10 @@
 # F2FMatcher — Fiber-to-Fiber Matching Across Histological Stains
 
-F2FMatcher matches individual muscle fibers (myofibers) across pairs of histological images from serial sections of the same muscle sample. It handles cross-stain matching (e.g., immunofluorescence vs histochemistry, different IHC markers) by combining a **VAE-based latent representation** of Cellpose flow fields, a **pairwise classifier** on latent embeddings, and a **geometry-aware iterative matching algorithm** that propagates matches using spatial consistency constraints.
+F2FMatcher identifies corresponding muscle fibers across pairs of histological images taken from serial sections of the same tissue sample, even when the sections are stained with different markers (e.g., immunofluorescence vs histochemistry, or different IHC panels). It combines a **VAE** that encodes Cellpose flow fields into a compact latent space, a **pairwise classifier** that scores fiber similarity across stains, and a **geometry-aware matching algorithm** that iteratively propagates matches under spatial consistency constraints.
 
 ![Matching example](video/comparison.gif)
 
-*Fiber matching across serial muscle sections stained with different markers. Each section is segmented by Cellpose to delineate individual fibers; Cellpose flow fields are encoded into a VAE latent space, then fibers are matched across stains by a pairwise classifier whose predictions are refined through iterative geometry-constrained label propagation.*
+*Two serial muscle sections stained with different markers. Cellpose segments individual fibers; F2FMatcher links corresponding fibers across the two stains using VAE embeddings, pairwise classification, and iterative geometry-constrained label propagation.*
 
 ## Pipeline Overview
 
@@ -169,15 +169,12 @@ For remaining unmatched ROIs:
 conda env create -f environment.yml
 conda activate fibermatcher
 
-# 2. Install the package in development mode
-cd /DATA/F2FMatcher
+# 2. Install the package
 pip install -e .
 
-# 3. Model checkpoints are included in models/
-#    - VAE: models/LatentVAE2_256_128.pth
-#    - Classifier: models/fibermatcher_cls_2.pth
-#    - Cellpose models (external, set path in config):
-#      /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models/
+# 3. Verify model checkpoints are present (included in repo):
+ls models/
+#    Expected: LatentVAE2_256_128.pth, fibermatcher_cls_2.pth, models/CellPose2_finetuned/
 ```
 
 ## Usage
@@ -224,13 +221,12 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 | `dataset` | `crop_size: 256`, `resize: 128`, `n_augmentation: 50` |
 | `vae` | `latent_dim: 256`, `checkpoint: models/LatentVAE2_256_128.pth` |
 | `classifier` | `checkpoint: models/fibermatcher_cls_2.pth`, `batch_size: 256`, `lr: 0.0001` |
-| `cellpose` | `model_path: (external, set in config)`, `flow_threshold: 0.4` |
+| `cellpose` | `model_path: models/CellPose2_finetuned`, `flow_threshold: 0.4` |
 | `matching` | `n_initial_guess: 80`, `distance_neighbors_ref: 200`, `min_cls_logit: 0.5` |
 
 ## Project Structure
 
 ```
-/DATA/F2FMatcher/
 ├── src/f2fmatcher/
 │   ├── config.py              # YAML config loader
 │   ├── cli.py                 # CLI entry point
@@ -269,14 +265,6 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 | Propagation steps | 10 – 20 |
 | Initial seeds | 12 – 80 selected from 80 guesses |
 | Classifier val F1 | ≈ 0.944 |
-
-## Video
-
-![Matching animation](video/comparison.gif)
-
-Full video: [comparison.mp4](video/comparison.mp4)
-
-*The matching process in action. Cellpose segmentations are shown as fiber contours; pairs of fibers predicted to correspond across the two stains are linked by matching labels and colored overlays. The algorithm starts from a small set of geometrically consistent seed pairs and iteratively propagates matches to neighboring fibers, converging to cover most fibers in the section.*
 
 ## License
 
