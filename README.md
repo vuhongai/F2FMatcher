@@ -4,7 +4,7 @@ F2FMatcher matches individual muscle fibers (myofibers) across pairs of histolog
 
 ![Matching example](video/comparison.gif)
 
-*Cross-stain fiber matching. Serial sections stained with different markers are segmented with Cellpose, encoded into a VAE latent space, and matched via iterative geometry-constrained label propagation.*
+*Fiber matching across serial muscle sections stained with different markers. Each section is segmented by Cellpose to delineate individual fibers; Cellpose flow fields are encoded into a VAE latent space, then fibers are matched across stains by a pairwise classifier whose predictions are refined through iterative geometry-constrained label propagation.*
 
 ## Pipeline Overview
 
@@ -276,7 +276,7 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 
 Full video: [comparison.mp4](video/comparison.mp4)
 
-*Visualization of the iterative matching process. Contours show Cellpose segmentations; labeled pairs link corresponding fibers across stains.*
+*The matching process in action. Cellpose segmentations are shown as fiber contours; pairs of fibers predicted to correspond across the two stains are linked by matching labels and colored overlays. The algorithm starts from a small set of geometrically consistent seed pairs and iteratively propagates matches to neighboring fibers, converging to cover most fibers in the section.*
 
 ## License
 
