@@ -1,0 +1,55 @@
+seed: 1024
+device: cuda
+
+dataset:
+  thrs_roi_area: 100
+  crop_size: 256
+  resize: 128
+  n_augmentation: 50
+  max_rotation_deg: 90
+  max_shear_deg: 5
+  max_scale_dev: 0.1
+  dir: null  # set per-run
+
+vae:
+  latent_dim: 256
+  batch_size: 32
+  lr: 0.001
+  n_epochs: 20
+  patience: 10
+  beta_kl: 0.001
+  beta_consistency: 1.0
+  checkpoint: /DATA/fiber_matcher/model/LatentVAE2_256_128.pth
+
+classifier:
+  embedding_dim: 256
+  batch_size: 256
+  lr: 0.0001
+  n_epochs: 50
+  patience: 10
+  negative_fold: 4
+  dir_embedding: ./embed
+  dataset_path: null  # set per-run
+  checkpoint: /DATA/fiber_matcher/model/fibermatcher_cls_2.pth
+
+cellpose:
+  model_path: /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models
+  cellprob_threshold: 0
+  flow_threshold: 0.4
+
+matching:
+  list_k: [3, 5, 7]
+  n_initial_guess: 80
+  n_pair_selected: 4
+  min_cls_logit_init: 0.75
+  distance_neighbors_ref: 200
+  max_distance_affine: 150
+  max_cost_geo_neighbors_sides: 30
+  max_cost_geo_neighbors_angles: 0.15
+  min_cls_logit: 0.5
+  patience_label: 5
+  n_neighbors_validation: 3
+  n_try_unannotated: 1
+  patience_prediction_neighbors: 5
+  n_processes: 60
+  use_multiprocessing: true
