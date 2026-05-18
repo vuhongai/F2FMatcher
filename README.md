@@ -173,10 +173,11 @@ conda activate fibermatcher
 cd /DATA/F2FMatcher
 pip install -e .
 
-# 3. Download required model checkpoints (already at):
-#    - VAE: /DATA/fiber_matcher/model/LatentVAE2_256_128.pth
-#    - Classifier: /DATA/fiber_matcher/model/fibermatcher_cls_2.pth
-#    - Cellpose models: /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models/
+# 3. Model checkpoints are included in models/
+#    - VAE: models/LatentVAE2_256_128.pth
+#    - Classifier: models/fibermatcher_cls_2.pth
+#    - Cellpose models (external, set path in config):
+#      /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models/
 ```
 
 ## Usage
@@ -221,9 +222,9 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 | Section | Key parameters |
 |---|---|
 | `dataset` | `crop_size: 256`, `resize: 128`, `n_augmentation: 50` |
-| `vae` | `latent_dim: 256`, `checkpoint: /path/to/LatentVAE2_256_128.pth` |
-| `classifier` | `checkpoint: /path/to/fibermatcher_cls_2.pth`, `batch_size: 256`, `lr: 0.0001` |
-| `cellpose` | `model_path: /path/to/CP_models`, `flow_threshold: 0.4` |
+| `vae` | `latent_dim: 256`, `checkpoint: models/LatentVAE2_256_128.pth` |
+| `classifier` | `checkpoint: models/fibermatcher_cls_2.pth`, `batch_size: 256`, `lr: 0.0001` |
+| `cellpose` | `model_path: (external, set in config)`, `flow_threshold: 0.4` |
 | `matching` | `n_initial_guess: 80`, `distance_neighbors_ref: 200`, `min_cls_logit: 0.5` |
 
 ## Project Structure

@@ -19,7 +19,7 @@ vae:
   patience: 10
   beta_kl: 0.001
   beta_consistency: 1.0
-  checkpoint: /DATA/fiber_matcher/model/LatentVAE2_256_128.pth
+  checkpoint: models/LatentVAE2_256_128.pth
 
 classifier:
   embedding_dim: 256
@@ -30,7 +30,7 @@ classifier:
   negative_fold: 4
   dir_embedding: ./embed
   dataset_path: null  # set per-run
-  checkpoint: /DATA/fiber_matcher/model/fibermatcher_cls_2.pth
+  checkpoint: models/fibermatcher_cls_2.pth
 
 cellpose:
   model_path: /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models

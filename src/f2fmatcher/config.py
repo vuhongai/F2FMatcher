@@ -53,8 +53,8 @@ class Config:
 
 def load_config(path=None, overrides=None):
     here = os.path.dirname(os.path.abspath(__file__))
-    default_path = os.path.join(here, "..", "..", "configs", "default.yaml")
-    default_path = os.path.normpath(default_path)
+    project_root = os.path.normpath(os.path.join(here, "..", ".."))
+    default_path = os.path.join(project_root, "configs", "default.yaml")
 
     cfg = Config.from_yaml(default_path)
 
@@ -65,4 +65,28 @@ def load_config(path=None, overrides=None):
     if overrides:
         cfg = cfg.merge(overrides)
 
+    _resolve_paths(cfg, project_root)
     return cfg
+
+
+_PATH_KEYS = [
+    "vae.checkpoint",
+    "classifier.checkpoint",
+    "cellpose.model_path",
+]
+
+
+def _resolve_paths(cfg, project_root):
+    for key in _PATH_KEYS:
+        val = cfg.get(key)
+        if val and not os.path.isabs(val):
+            resolved = os.path.normpath(os.path.join(project_root, val))
+            _set_path(cfg, key, resolved)
+
+
+def _set_path(cfg, key, value):
+    keys = key.split(".")
+    d = cfg._config_dict
+    for k in keys[:-1]:
+        d = d[k]
+    d[keys[-1]] = value
