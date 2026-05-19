@@ -26,19 +26,18 @@ def local_prediction_task(args):
     _, neighbors_label_1 = get_neighbors_ref_by_distance(D1, id1_ref, list_label_1, distance_neighbors_ref)
     _, neighbors_label_2 = get_neighbors_ref_by_distance(D2, id2_ref, list_label_2, distance_neighbors_ref)
 
-    neighbors_id_1 = [label2index["img1"][l] for l in neighbors_label_1]
-    neighbors_id_2 = [label2index["img2"][l] for l in neighbors_label_2]
+    n1 = [label2index["img1"][l] for l in neighbors_label_1]
+    n2 = [label2index["img2"][l] for l in neighbors_label_2]
 
-    prediction_update_ref = np.zeros(matrix_cost.shape)
-    prediction_update_ref[np.ix_(neighbors_id_1, neighbors_id_2)] = 1
-    prediction_update_ref *= prediction_update
-
-    matrix_cost_ref = matrix_cost * prediction_update_ref
-    matrix_cost_pseudo = matrix_cost_ref.copy()
+    pred_sub = prediction_update[np.ix_(n1, n2)].copy()
+    cost_ref_sub = matrix_cost[np.ix_(n1, n2)] * pred_sub
+    cost_pseudo_sub = cost_ref_sub.copy()
+    patience_sub = np.zeros(cost_ref_sub.shape, dtype=int)
     matched_local = []
 
-    while np.max(matrix_cost_ref) > 0:
-        max_id1, max_id2 = np.unravel_index(np.argmax(matrix_cost_pseudo), matrix_cost_pseudo.shape)
+    while np.max(cost_ref_sub) > 0:
+        li, lj = np.unravel_index(np.argmax(cost_pseudo_sub), cost_pseudo_sub.shape)
+        max_id1, max_id2 = n1[li], n2[lj]
         label1, label2 = list_label_1[max_id1], list_label_2[max_id2]
 
         matched_idx_1 = [i[0] for i in matched_indexes]
@@ -59,14 +58,20 @@ def local_prediction_task(args):
 
         if np.mean(side_costs) < max_cost_geo_neighbors_sides and np.mean(angle_costs) < max_cost_geo_neighbors_angles:
             matched_local.append((label1, label2))
-            prediction_update_ref[max_id1, :] = 0
-            prediction_update_ref[:, max_id2] = 0
-            matrix_cost_ref *= prediction_update_ref
-            matrix_cost_pseudo = matrix_cost_ref.copy()
+            pred_sub[li, :] = 0
+            pred_sub[:, lj] = 0
+            cost_ref_sub *= pred_sub
+            cost_pseudo_sub = cost_ref_sub.copy()
         else:
-            matrix_cost_pseudo[max_id1, max_id2] = 0
-            if np.max(matrix_cost_pseudo) == 0:
-                matrix_cost_pseudo = matrix_cost_ref.copy()
+            patience_sub[li, lj] += 1
+            if patience_sub[li, lj] > patience_label:
+                pred_sub[li, lj] = 0
+                cost_ref_sub *= pred_sub
+                cost_pseudo_sub *= pred_sub
+            cost_pseudo_sub[li, lj] = 0
+
+        if np.max(cost_pseudo_sub) == 0:
+            cost_pseudo_sub = cost_ref_sub.copy()
 
     return matched_local
 
@@ -163,19 +168,37 @@ def geometry_constraints(triple_idx, pseudo_c1, pseudo_c2):
     return costs_geometry(s1, a1, s2, a2)
 
 
+def _combos_in_chunks(n, k, chunk_size):
+    it = itertools.combinations(range(n), k)
+    while True:
+        chunk = list(itertools.islice(it, chunk_size))
+        if not chunk:
+            break
+        yield chunk
+
+
 def compute_geo_costs_parallel(n_initial_guess, n_pair_selected, n_processes, pseudo_c1, pseudo_c2):
-    combos = list(itertools.combinations(range(n_initial_guess), n_pair_selected))
-    args_list = [(idx, pseudo_c1, pseudo_c2) for idx in combos]
+    total_combos = math.comb(n_initial_guess, n_pair_selected)
+    chunk_size = max(5000, total_combos // n_processes // 4)
+    chunks = list(_combos_in_chunks(n_initial_guess, n_pair_selected, chunk_size))
 
     with multiprocessing.Pool(processes=n_processes) as pool:
-        costs = pool.map(_cost_geo_kROIs, args_list)
+        results = pool.map(
+            _cost_geo_kROIs_batch,
+            [(chunk, pseudo_c1, pseudo_c2) for chunk in chunks],
+        )
 
+    combos = list(itertools.chain.from_iterable(chunks))
+    costs = list(itertools.chain.from_iterable(results))
     return combos, costs
 
 
-def _cost_geo_kROIs(args):
-    k_idx, pseudo_c1, pseudo_c2 = args
-    return [geometry_constraints(t, pseudo_c1, pseudo_c2) for t in itertools.combinations(k_idx, 3)]
+def _cost_geo_kROIs_batch(args):
+    combos_chunk, pseudo_c1, pseudo_c2 = args
+    return [
+        [geometry_constraints(t, pseudo_c1, pseudo_c2) for t in itertools.combinations(idx, 3)]
+        for idx in combos_chunk
+    ]
 
 
 def estimate_affine_transform(P_list, Q_list):
