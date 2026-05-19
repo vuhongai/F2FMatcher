@@ -145,6 +145,22 @@ For each matched pair (A₁, A₂):
 ```
 
 **Convergence** is reached when fewer than 0.25% of total ROIs are added in one step.
+Intermediate results (`paired_labels.pkl`) are saved after each propagation step to prevent data loss if the pipeline is interrupted.
+
+### Stage 3b: Pre-caching for Faster Re-runs
+
+To skip Cellpose segmentation and VAE embedding on subsequent runs:
+
+```bash
+# Copy pre-computed masks, flows, and images
+cp $SRC/out_CP_masks/*_{CP_masks,CP_flows}.pkl $OUT/out_CP_masks/
+cp $SRC/images_segmentation/*.png $OUT/images_segmentation/
+
+# Run only the matching stage
+f2fmatcher run-pipeline ... --skip-vae-inputs --skip-embeddings
+```
+
+Classifier scores are also cached to disk (`{dir_embedding}/{img1}_vs_{img2}_scores.npy`) so the 30-40s cost-matrix computation is skipped on re-runs.
 
 ### Stage 4: Fill Unannotated ROIs
 
@@ -222,6 +238,7 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 | `vae` | `latent_dim: 256`, `checkpoint: models/LatentVAE2_256_128.pth` |
 | `classifier` | `checkpoint: models/fibermatcher_cls_2.pth`, `batch_size: 256`, `lr: 0.0001` |
 | `cellpose` | `model_path: models/CellPose2_finetuned`, `flow_threshold: 0.4` |
+| `matching` | `use_multiprocessing: true` (uses `joblib.Parallel` with `n_jobs=n_processes`) |
 | `matching` | `n_initial_guess: 80`, `distance_neighbors_ref: 200`, `min_cls_logit: 0.5` |
 
 ## Project Structure
@@ -230,20 +247,39 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 ├── src/f2fmatcher/
 │   ├── config.py              # YAML config loader
 │   ├── cli.py                 # CLI entry point
+│   ├── scripts/               # Runnable CLIs (pipeline, training)
 │   ├── io/                    # CZI reader, pixel sizes
 │   ├── segmentation/          # Cellpose wrapper, augmentation
 │   ├── vae/                   # VAE model, dataset, training, embedding
 │   ├── classifier/            # PairClassifier, dataset, training
-│   ├── matching/              # Spatial signatures, cost matrix, propagation
+│   ├── matching/              # Spatial signatures, cost matrix, propagation, intermediate saves
 │   ├── analysis/              # Staining quantification
 │   ├── visualization/         # Prediction plots
 │   └── utils/                 # Seed, IO helpers
-├── scripts/                   # Runnable CLIs
 ├── configs/                   # YAML config files
 ├── tests/                     # Unit tests
 ├── notebooks/                 # Annotation QA notebooks
 └── pyproject.toml             # Package definition
 ```
+
+### Overriding cellpose.model_path
+
+The default Cellpose model path in `configs/default.yaml` resolves to the bundled `models/CellPose2_finetuned/` directory. If your system has a separate model zoo, you can override it by creating a minimal YAML and passing it via `--param-file`:
+
+```yaml
+# config_override.yaml
+cellpose:
+  model_path: /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models
+```
+
+Then run with:
+```bash
+f2fmatcher run-pipeline --param-file config_override.yaml ...other args...
+```
+
+The `cellpose.model_path` is a *directory* containing model files; the individual model is selected by `--cp-model-1` / `--cp-model-2`.
+
+---
 
 ## Data Format
 
@@ -260,12 +296,99 @@ All pipeline parameters are in `configs/default.yaml`. Key sections:
 | Metric | Value |
 |---|---|
 | ROIs per image | 2,000 – 3,500 |
-| Matched pairs per pair | 1,900 – 2,800 |
+| Matched pairs per pair | 1,900 – 3,100 |
 | Coverage | 50 – 95% |
-| Propagation steps | 10 – 20 |
+| Propagation steps | 6 – 12 |
 | Initial seeds | 12 – 80 selected from 80 guesses |
 | Classifier val F1 | ≈ 0.944 |
+| Propagation convergence | <0.25% new pairs per step |
+
+### Real-world example: TAG04 (DYS_COL4 vs IgG_CD11B, 3318×3363 ROIs)
+
+| Metric | Value |
+|---|---|
+| Reference pairs (production pipeline) | 3,172 |
+| Pairs matched (this pipeline) | 3,168 (99.8% overlap) |
+| Steps to converge | 9 |
+| Wasserstein computation | ~36 s (3 k-values × 12 s, 60 processes) |
+| Local prediction per step | 20–80 s (longer in early steps with ≥1000 seeds) |
+| Total runtime (fresh) | ~12 min |
+| Total runtime (cached scores + pre-cached masks) | ~10 min |
+| GPU memory | negligible (classifier inference only) |
+| CPU peak | ~10 GB for 3318×3363 cost matrix (float32) |
+
+### Propagation step breakdown (TAG04)
+
+| Step | Seeds | New pairs | Total | Time (s) |
+|------|-------|-----------|-------|----------|
+| 1 | 80 | +864 | 944 | ~1 |
+| 2 | 806 | +829 | 1,773 | 67 |
+| 3 | 968 | +630 | 2,403 | 79 |
+| 4 | 1,070 | +452 | 2,855 | 87 |
+| 5 | 1,150 | +218 | 3,073 | 95 |
+| 6 | 1,014 | +54 | 3,127 | 80 |
+| 7 | 970 | +21 | 3,148 | 78 |
+| 8 | 937 | +13 | 3,161 | 75 |
+| 9 | 755 | +5 | 3,166 + 2 fill | 59 |
+
+### Time & hardware estimates
+
+Timing depends primarily on ROI count and available CPU cores for parallel computation (Wasserstein and local propagation both scale with `n_processes`).
+
+#### ~3,000 ROIs per image (e.g., mouse TA)
+
+| Hardware | Runtime per pair |
+|---|---|
+| 60 CPU cores | ~12 min |
+| 32 CPU cores | ~18 min |
+| 16 CPU cores | ~30 min |
+| 8 CPU cores | ~55 min |
+| 4 CPU cores | ~100 min |
+
+| Resource | Usage |
+|---|---|
+| RAM | ~10 GB |
+| VRAM | ~2 GB (GPU only for classifier inference) |
+| Storage | ~2 GB per pair (embeddings, npz, outputs) |
+| GPU | Any CUDA-capable GPU with ≥4 GB VRAM |
+
+#### ~6,000 ROIs per image (e.g., mouse Quadriceps)
+
+| Hardware | Runtime per pair |
+|---|---|
+| 60 CPU cores | ~35 min |
+| 32 CPU cores | ~55 min |
+| 16 CPU cores | ~100 min |
+| 8 CPU cores | ~3 h |
+| 4 CPU cores | ~6 h |
+
+| Resource | Usage |
+|---|---|
+| RAM | ~20 GB |
+| VRAM | ~6 GB |
+| Storage | ~6 GB per pair |
+| GPU | CUDA GPU with ≥8 GB VRAM recommended |
+
+**Scaling notes:**
+- Wasserstein similarity and classifier inference scale **O(N₁ × N₂)** in the number of ROIs
+- Local propagation scales with the number of matched seeds × average neighbor count within `distance_neighbors_ref` (200 px) — roughly **O(N¹·²)** due to spatial clustering
+- Cost matrix size: ~11 M entries at 3k ROIs (44 MB float32), ~36 M at 6k ROIs (144 MB float32)
+- Disk cache for scores (`*_vs_*_scores.npy`) is 44–144 MB per pair
+
+### Speed-up tips
+
+- **Cache scores**: run once, then `{dir_embedding}/*_vs_*_scores.npy` loads automatically (~36 s saved)
+- **Pre-cache CP masks**: copy masks/flow pkl files to output dir (~2 min saved)
+- **Reduce `distance_neighbors_ref`** (default 200): lowering to 150 shrinks submatrices in dense clusters, cutting ~15% per step at the cost of slightly fewer matches in sparse regions
+- **Intermediate saves**: added after each propagation step — partial results survive if the pipeline is interrupted
 
 ## License
 
 MIT License (see `LICENSE`).
+
+## Acknowledgments
+
+This software uses **[Cellpose 2.0](https://www.cellpose.org/)** (Stringer et al., 2021; Pachitariu et al., 2022) for cell/fiber segmentation. The finetuned Cellpose models were trained by the DDC team (Genethon).
+
+- Stringer, C., Wang, T., Michaelos, M., & Pachitariu, M. (2021). Cellpose: a generalist algorithm for cellular segmentation. *Nature Methods*, 18, 100–106.
+- Pachitariu, M. & Stringer, C. (2022). Cellpose 2.0: how to train your own model. *Nature Methods*, 19, 1634–1641.

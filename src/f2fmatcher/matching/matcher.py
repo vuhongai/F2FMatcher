@@ -168,6 +168,13 @@ def match_fibers(
 
         step += 1
 
+        # intermediate save
+        if save_step_prediction and dir_save_prediction_output is not None:
+            import pickle
+            with open(f"{dir_save_prediction_output}/paired_labels.pkl", "wb") as f:
+                pickle.dump(matched_labels, f)
+            print(f"   [intermediate save] step {step}: {len(matched_labels)} pairs")
+
     # --- fill unannotated ---
     if save_step_prediction:
         step_prediction["4_unannotated_prediction"] = []
