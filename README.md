@@ -42,7 +42,7 @@ CZI/PNG input
 
 ### VAE: SharedMultiHeadVAE
 
-The VAE compresses Cellpose flow fields (128×128 crops) into 256-dimensional latent vectors.
+The VAE compresses Cellpose flow fields (256×256 ROI crops resized to 128×128) into 256-dimensional latent vectors.
 
 **Encoder (VAEEncoder):**
 ```
