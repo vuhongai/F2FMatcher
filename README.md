@@ -1,4 +1,4 @@
-# F2FMatcher — Fiber-to-Fiber Matching Across Histological Stains
+# F2FMatcher: Fiber-to-Fiber Matching Across Histological Stains
 
 F2FMatcher identifies corresponding muscle fibers across pairs of histological images taken from serial sections of the same tissue sample, even when the sections are stained with different markers (e.g., immunofluorescence vs histochemistry, or different IHC panels). It combines a **VAE** that encodes Cellpose flow fields into a compact latent space, a **pairwise classifier** that scores fiber similarity across stains, and a **geometry-aware matching algorithm** that iteratively propagates matches under spatial consistency constraints.
 
@@ -269,7 +269,7 @@ The default Cellpose model path in `configs/default.yaml` resolves to the bundle
 ```yaml
 # config_override.yaml
 cellpose:
-  model_path: /media/DATABRUT/DB_DDC/serverGPU/CellPose_DDC/CP_model_zoo/models
+  model_path: your_finetuned_cellpose_models_directory/
 ```
 
 Then run with:
@@ -303,7 +303,7 @@ The `cellpose.model_path` is a *directory* containing model files; the individua
 | Classifier val F1 | ≈ 0.944 |
 | Propagation convergence | <0.25% new pairs per step |
 
-### Real-world example: TAG04 (DYS_COL4 vs IgG_CD11B, 3318×3363 ROIs)
+### Real-world example: TAG04 (IHF1 vs IHF2, 3318×3363 ROIs)
 
 | Metric | Value |
 |---|---|
@@ -316,20 +316,6 @@ The `cellpose.model_path` is a *directory* containing model files; the individua
 | Total runtime (cached scores + pre-cached masks) | ~10 min |
 | GPU memory | negligible (classifier inference only) |
 | CPU peak | ~10 GB for 3318×3363 cost matrix (float32) |
-
-### Propagation step breakdown (TAG04)
-
-| Step | Seeds | New pairs | Total | Time (s) |
-|------|-------|-----------|-------|----------|
-| 1 | 80 | +864 | 944 | ~1 |
-| 2 | 806 | +829 | 1,773 | 67 |
-| 3 | 968 | +630 | 2,403 | 79 |
-| 4 | 1,070 | +452 | 2,855 | 87 |
-| 5 | 1,150 | +218 | 3,073 | 95 |
-| 6 | 1,014 | +54 | 3,127 | 80 |
-| 7 | 970 | +21 | 3,148 | 78 |
-| 8 | 937 | +13 | 3,161 | 75 |
-| 9 | 755 | +5 | 3,166 + 2 fill | 59 |
 
 ### Time & hardware estimates
 
