@@ -18,7 +18,7 @@ def run_single_pair(img1, img2, source_1, source_2, czi1, czi2, channel1, channe
                     cp_model_1, cp_model_2, param1, param2, obj1, obj2,
                     dir_output, export_images, save_step_prediction, n_processes, device,
                     skip_vae_inputs, skip_embeddings,
-                    config):
+                    config, cellpose_gpu=True):
     param_ref = ["fluorescence", "10X", 1.0]
     param_img1 = [param1, obj1, 1.0]
     param_img2 = [param2, obj2, 1.0]
@@ -60,13 +60,15 @@ def run_single_pair(img1, img2, source_1, source_2, czi1, czi2, channel1, channe
         seg_kwargs["CP_model_path"] = cp_path
 
     if skip_vae_inputs:
-        cp1 = segment_image(f"{images_dir}/{img1}.png", cp_model_1, savedir=dir_cp_masks, **seg_kwargs)
-        cp2 = segment_image(f"{images_dir}/{img2}.png", cp_model_2, savedir=dir_cp_masks, **seg_kwargs)
+        cp1 = segment_image(f"{images_dir}/{img1}.png", cp_model_1, savedir=dir_cp_masks,
+                            gpu=cellpose_gpu, **seg_kwargs)
+        cp2 = segment_image(f"{images_dir}/{img2}.png", cp_model_2, savedir=dir_cp_masks,
+                            gpu=cellpose_gpu, **seg_kwargs)
     else:
         cp1 = generate_VAE_inputs(img1, images_dir, dir_npz, cp_model_1, dir_cp_masks,
-                                  n_processes=n_processes, **seg_kwargs)
+                                  n_processes=n_processes, gpu=cellpose_gpu, **seg_kwargs)
         cp2 = generate_VAE_inputs(img2, images_dir, dir_npz, cp_model_2, dir_cp_masks,
-                                  n_processes=n_processes, **seg_kwargs)
+                                  n_processes=n_processes, gpu=cellpose_gpu, **seg_kwargs)
 
     # 3. VAE embeddings
     if not skip_embeddings:
@@ -138,6 +140,7 @@ def run_single_pair(img1, img2, source_1, source_2, czi1, czi2, channel1, channe
 def run_pipeline(args):
     config = load_config(args.param_file) if args.param_file else load_config()
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+    cellpose_gpu = device.type == "cuda"
 
     if args.param_file:
         from f2fmatcher.utils.io_utils import import_module_from_path
@@ -158,6 +161,7 @@ def run_pipeline(args):
                 getattr(params, "skip_generate_VAE_inputs", False),
                 getattr(params, "skip_generate_embeddings", False),
                 config,
+                getattr(params, "cellpose_gpu", cellpose_gpu),
             )
     else:
         run_single_pair(
@@ -171,4 +175,5 @@ def run_pipeline(args):
             args.n_processes, device,
             args.skip_vae_inputs, args.skip_embeddings,
             config,
+            cellpose_gpu,
         )

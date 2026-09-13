@@ -10,7 +10,8 @@ from skimage.morphology import remove_small_objects
 
 
 def segment_image(img_path, CP_model_name, CP_model_path="/home/ddc/CP_model_zoo/models/",
-                  savedir="./", channels=(0, 0), cellprob_threshold=0, flow_threshold=0.4):
+                  savedir="./", channels=(0, 0), cellprob_threshold=0, flow_threshold=0.4,
+                  gpu=True):
     base_name = os.path.basename(img_path).split(".")[0]
     path_masks = f"{savedir}/{base_name}_CP_masks.pkl"
     path_flows = f"{savedir}/{base_name}_CP_flows.pkl"
@@ -21,7 +22,7 @@ def segment_image(img_path, CP_model_name, CP_model_path="/home/ddc/CP_model_zoo
         with open(path_flows, "rb") as f:
             flows = pickle.load(f)
     else:
-        cp_model = models.CellposeModel(gpu=True, pretrained_model=f"{CP_model_path}/{CP_model_name}")
+        cp_model = models.CellposeModel(gpu=gpu, pretrained_model=f"{CP_model_path}/{CP_model_name}")
         diameter = cp_model.diam_labels
         images = [cp_io.imread(img_path)]
         masks, flows, styles = cp_model.eval(
@@ -114,13 +115,14 @@ def _save_single_vae_input(label_id, centroids_yx, masks, img_rec, img_name, dir
 
 
 def generate_VAE_inputs(img_name, images_dir, dir_save_npz, CP_model_name,
-                        dir_save_cellpose_masks, size_crop=256, CP_model_path=None, n_processes=60):
+                        dir_save_cellpose_masks, size_crop=256, CP_model_path=None, n_processes=60,
+                        gpu=True):
     image_path = f"{images_dir}/{img_name}.png"
     seg_kwargs = {}
     if CP_model_path is not None:
         seg_kwargs["CP_model_path"] = CP_model_path
     cp_output = segment_image(img_path=image_path, CP_model_name=CP_model_name,
-                              savedir=dir_save_cellpose_masks, **seg_kwargs)
+                              savedir=dir_save_cellpose_masks, gpu=gpu, **seg_kwargs)
     masks, props, img_rec = cp_output
     labels = filter_ROIs(cp_output, size_crop)
     centroids_yx = {p.label: p.centroid for p in props if p.label in labels}
@@ -133,7 +135,8 @@ def generate_VAE_inputs(img_name, images_dir, dir_save_npz, CP_model_name,
 
 
 def get_CP_masks(img_path, CP_model_name=None, CP_model_path="/home/ddc/CP_model_zoo/models/",
-                 savedir="./", channels=(0, 0), cellprob_threshold=0, flow_threshold=0.4):
+                 savedir="./", channels=(0, 0), cellprob_threshold=0, flow_threshold=0.4,
+                 gpu=True):
     base_name = os.path.basename(img_path).split(".")[0]
     path_masks = f"{savedir}/{base_name}_CP_masks.pkl"
 
@@ -141,7 +144,7 @@ def get_CP_masks(img_path, CP_model_name=None, CP_model_path="/home/ddc/CP_model
         with open(path_masks, "rb") as f:
             masks = pickle.load(f)
     else:
-        cp_model = models.CellposeModel(gpu=True, pretrained_model=f"{CP_model_path}/{CP_model_name}")
+        cp_model = models.CellposeModel(gpu=gpu, pretrained_model=f"{CP_model_path}/{CP_model_name}")
         diameter = cp_model.diam_labels
         images = [cp_io.imread(img_path)]
         masks, flows, styles = cp_model.eval(
