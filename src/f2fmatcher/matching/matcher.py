@@ -104,7 +104,7 @@ def match_fibers(
 
         if save_step_prediction:
             step_prediction["1_initial_guess"] = init_pairs
-
+        
         # Ablation: bypass the triangle-geometry seed validation and use the raw
         # top-cost greedy 1:1 picks as seeds, then run the identical propagation.
         # Isolates the contribution of the geometry-aware seeding step.

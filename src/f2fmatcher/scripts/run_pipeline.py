@@ -19,7 +19,8 @@ def run_single_pair(img1, img2, source_1, source_2, czi1, czi2, channel1, channe
                     dir_output, export_images, save_step_prediction, n_processes, device,
                     skip_vae_inputs, skip_embeddings,
                     config, cellpose_gpu=True,
-                    dump_cost=False, skip_geometry_seeding=False):
+                    dump_cost=False, skip_geometry_seeding=False,
+                    ):
     param_ref = ["fluorescence", "10X", 1.0]
     param_img1 = [param1, obj1, 1.0]
     param_img2 = [param2, obj2, 1.0]
