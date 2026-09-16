@@ -42,6 +42,8 @@ def match_fibers(
     use_multiprocessing_for_local_prediction=True,
     save_step_prediction=False,
     dir_save_prediction_output=None,
+    skip_geometry_seeding=False,
+    dump_cost_to=None,
 ):
     if save_step_prediction:
         step_prediction = {}
@@ -55,6 +57,23 @@ def match_fibers(
         img2, list_label_2, cp_output_2,
         classifier, dir_embedding, list_k,
     )
+
+    # Optional: dump the two raw cost components (+ label ordering and the gate
+    # thresholds) so the cost-matrix ablation can score them directly. Additive,
+    # off by default -> no effect on the normal pipeline.
+    if dump_cost_to is not None:
+        with open(dump_cost_to, "wb") as _f:
+            pickle.dump(
+                {
+                    "scores": scores,
+                    "spatial_dist": spatial_dist,
+                    "list_label_1": list(list_label_1),
+                    "list_label_2": list(list_label_2),
+                    "min_cls_logit": min_cls_logit,
+                    "min_cls_logit_init": min_cls_logit_init,
+                },
+                _f,
+            )
 
     centroids_1 = get_centroid_dict(cp_output_1[1], list_label_1)
     centroids_2 = get_centroid_dict(cp_output_2[1], list_label_2)
@@ -85,6 +104,13 @@ def match_fibers(
 
         if save_step_prediction:
             step_prediction["1_initial_guess"] = init_pairs
+
+        # Ablation: bypass the triangle-geometry seed validation and use the raw
+        # top-cost greedy 1:1 picks as seeds, then run the identical propagation.
+        # Isolates the contribution of the geometry-aware seeding step.
+        if skip_geometry_seeding:
+            selected_combs = list(range(len(init_pairs)))
+            break
 
         combos, costs_arr = compute_geo_costs_parallel(n_init, n_pair_selected, n_processes, pseudo_c1, pseudo_c2)
         costs_arr = np.array(costs_arr)

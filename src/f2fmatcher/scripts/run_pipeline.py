@@ -18,7 +18,8 @@ def run_single_pair(img1, img2, source_1, source_2, czi1, czi2, channel1, channe
                     cp_model_1, cp_model_2, param1, param2, obj1, obj2,
                     dir_output, export_images, save_step_prediction, n_processes, device,
                     skip_vae_inputs, skip_embeddings,
-                    config, cellpose_gpu=True):
+                    config, cellpose_gpu=True,
+                    dump_cost=False, skip_geometry_seeding=False):
     param_ref = ["fluorescence", "10X", 1.0]
     param_img1 = [param1, obj1, 1.0]
     param_img2 = [param2, obj2, 1.0]
@@ -111,6 +112,8 @@ def run_single_pair(img1, img2, source_1, source_2, czi1, czi2, channel1, channe
         use_multiprocessing_for_local_prediction=getattr(matching_cfg, "use_multiprocessing", True),
         save_step_prediction=save_step_prediction,
         dir_save_prediction_output=pair_dir,
+        skip_geometry_seeding=skip_geometry_seeding,
+        dump_cost_to=(f"{pair_dir}/cost_matrices.pkl" if dump_cost else None),
     )
 
     with open(f"{pair_dir}/paired_labels.pkl", "wb") as f:
