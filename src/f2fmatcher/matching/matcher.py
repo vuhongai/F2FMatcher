@@ -122,8 +122,24 @@ def match_fibers(
         return [], scores, spatial_dist, [cp_output_1, cp_output_2]
 
     init_pairs = [init_pairs[i] for i in selected_combs]
+
+    # Peel inconsistent seeds until the set is self-consistent
+    seed_pairs = list(set(init_pairs))
+    while len(seed_pairs) >= 3:
+        peeled = filter_matched_pairs(
+            seed_pairs, label2index, D1, D2, n_neighbors_validation,
+            centroids_1, centroids_2, max_cost_geo_neighbors_sides,
+            max_cost_geo_neighbors_angles)
+        if len(peeled) >= len(seed_pairs):
+            break
+        seed_pairs = peeled
+    if len(seed_pairs) < 3:
+        return [], scores, spatial_dist, [cp_output_1, cp_output_2]
+    if len(seed_pairs) < len(init_pairs):
+        print(f"   Seed peel: {len(init_pairs)} -> {len(seed_pairs)}")
+
     matched_labels, matched_indexes, matched_labels_dict, prediction, prediction_update, matrix_cost = \
-        update_prediction(init_pairs, scores, spatial_dist, min_cls_logit, label2index)
+        update_prediction(seed_pairs, scores, spatial_dist, min_cls_logit, label2index)
 
     if save_step_prediction:
         step_prediction["2_selected_combs_from_initial_guess"] = matched_labels
@@ -190,7 +206,6 @@ def match_fibers(
 
         # intermediate save
         if save_step_prediction and dir_save_prediction_output is not None:
-            import pickle
             with open(f"{dir_save_prediction_output}/paired_labels.pkl", "wb") as f:
                 pickle.dump(matched_labels, f)
             print(f"   [intermediate save] step {step}: {len(matched_labels)} pairs")
